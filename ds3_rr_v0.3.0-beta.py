@@ -1,18 +1,30 @@
 
-# Desc: Extract players' names from Dark Souls 3 videos
+# Desc: Extract players' names from Dark Souls 3 gameplay videos
 
 # todo:
-# prog
-#   queue len monitoring. where is bottleneck?
+# cleanup input and output dir selection +
+#   input: explicit with arg (dir or file), script/exe loc
+#   output: explicit with --output, vid dir if only one dir, script/exe loc if multi or no vid dirs
+#   remove cwd +
+#   double slash paths
+# imput_dirs in arg_d? can also be used for determining output loc +
+# remove explicit arg +
+# prog +
+#   move to processing f + ~5% improvement
 # consecutive errors
-# bench
+# bench +
 # queue get: block=True, timeout=None and remove nested while true - hangs on windows
-# replace queue_full_wait +
 # calc arr shape only on new vid
-# unn final file write
+# f strings
+# tally num of frame reads vs num ocr reads
+# is_file_readable(filepath) unn? test
+# --help option
+# globals
+
 
  
 
+version = '0.3.0-beta'
 
 
 import time
@@ -33,10 +45,9 @@ import queue
 # Benchmarking
 startTime = time.time()
 time_vcap_l = []  # Video capture
-time_fr_l = []  # Frame read
+time_frame_read_l = []  # Frame read
 time_crop_l = []  # Crop/misc
 time_tess_l = []  # OCR
-kbit_per_frame_l = []  # Kbits per frame grand total
 
 # Phrases to remove from player names
 prefix_l = ['Phantom', 'Blue spirit', 'Blade of the Darkmoon', 'Dark spirit', 'Mad dark spirit', 'Aldrich Faithful', 'Loyal spirit, Aldrich Faithful', 'Watchdog of Farron', 'Loyal spirit, Watchdog of Farron', 'Task completed. Blade of the Darkmoon', 'Spear of the Church', 'Invaded the world of']
@@ -50,6 +61,7 @@ class video:
     skip_tally = 0  # for prog
     frame_gt = 0  # Number of frames grand total
     duration_gt = 0  # Footage duration grand total
+    kbit_per_frame_l = []  # Kbits per frame grand total
 
     
     def __init__(self, path):
@@ -73,7 +85,7 @@ class video:
             self.frame_count = 0
             self.time_vcap = time.perf_counter()
             self.vcap = cv2.VideoCapture(self.path)
-            #time_vcap_l.append((time.perf_counter() - time_vcap))
+            time_vcap_l.append((time.perf_counter() - self.time_vcap))
             if not self.vcap.isOpened(): raise
             return True
         except Exception as errex:
@@ -108,23 +120,31 @@ class video:
     def tally_video_stats(self):
         video.frame_gt += self.frame_total
         video.duration_gt += self.video_duration
-        kbit_per_frame_l.append(self.weighted_kbit)
+        video.kbit_per_frame_l.append(self.weighted_kbit)
 
 
-
-    
 class frame_c:
     def __init__(self, vid):
         self.vid = vid
         time_frame_read = time.perf_counter()
-        vid.vcap.set(1, vid.frame_count)  # 1 designates CAP_PROP_POS_FRAMES (which frame to read)
-
         try:
+            vid.vcap.set(1, vid.frame_count)  # 1 designates CAP_PROP_POS_FRAMES (which frame to read)
             self.numpy_array = vid.vcap.read()[1][:, :, 0]  # Read frame # Remove color data
+            time_frame_read_l.append((time.perf_counter() - time_frame_read))
         except Exception as errex:
             print('vcap frame read failed')
-        #time_fr_l.append((time.perf_counter() - time_frame_read))
 
+
+def set_default_options():
+    arg_d = {
+    'recursive': True,
+    'noskip': False,
+    'input_dir_l': [],
+    'output_dir': None,
+    'result_file_l': [],
+    'leniency': 1
+    }
+    return arg_d
 
 
 def parse_option_arg(arg, arg_d):
@@ -132,53 +152,47 @@ def parse_option_arg(arg, arg_d):
         case '--nonrecursive':
             arg_d['recursive'] = False
             print('Option set: nonrecursive')
+            
         case '--noskip':
             arg_d['noskip'] = True
             print('Option set: noskip')
+            
         case s if s.startswith('--output='):
             arg_d['output_dir'] = ''.join(arg.split('--output=')[1:])
-            arg_d['explicit_output'] = True
             print('Option set: output location:', arg_d['output_dir'])
+            
         case '--strict':
             arg_d['leniency'] = 0
             print('Option set: strict phrase matching')
+            
         case '--lenient':
             arg_d['leniency'] = 2
             print('Option set: lenient phrase matching')
+            
         case other:
             print('\nOption not recognized:', arg)
+            
     return arg_d
 
 
 def parse_dir_arg(arg, arg_d):
-    # Set output location based on input
-    if not arg_d['explicit_output']:  # Set output dir if not explicitly stated
-        if not arg_d['output_dir']:  # Output not set
-            arg_d['output_dir'] = arg  # Use first dir
-            
-        elif not os.path.abspath(arg_d['output_dir']) in os.path.abspath(arg):  # Change output from first dir to CWD if not child dir
-            arg_d['output_dir'] = os.getcwd()  # Use CWD as output location when multi dirs are invoked
+    arg_d['input_dir_l'].append(arg)
 
     # Gather sub dirs only when recursive
     if arg_d['recursive']:
         child_l = [os.path.join(arg, child) for child in os.listdir(arg)]  # List of args in dir
     else:
         child_l = [os.path.join(arg, child) for child in os.listdir(arg) if os.path.isfile(os.path.join(arg, child))]  # List of files in dir
-    arg_d = parse_args(child_l, arg_d)  ## does this need to return a new arg_d? arg_d = parse_args(child_l, arg_d)
 
+    arg_d = parse_args(child_l, arg_d)
     return arg_d
 
 
-def parse_file_arg(arg, arg_d):            
-    if not os.access(arg, os.R_OK):
-        print('Error: File is not readable:', arg)
-        return arg_d
-        
-    if ntpath.basename(arg).startswith(ntpath.basename(result_filename.rsplit('.', maxsplit=1)[0])):  # Result file
-        arg_d['result_file_l'].append(arg)
+def parse_file_arg(arg, arg_d):
+    if ntpath.basename(arg) == ntpath.basename(result_filename):  # Result file
         print('Result file detected:', arg)
+        arg_d['result_file_l'].append(arg)
     else:
-        #if is_video_file(arg):  ## mime check occurs later
         all_files_l.append(arg)
 
     return arg_d
@@ -196,6 +210,9 @@ def parse_args(arg_l, arg_d):
         elif os.path.isfile(arg):
             arg_d = parse_file_arg(arg, arg_d)
 
+        else:
+            print('Argument must be an option, directory, or file:', arg)
+
     return arg_d
 
 
@@ -211,6 +228,29 @@ def merge_input_files(result_file_l):
                         player_name_d[key].append(each_vid)
             else:
                 player_name_d[key] = value
+
+
+def check_no_input_files(arg_d):
+    if not all_files_l:
+        print('Using script/exe dir for input')
+        arg_d = parse_dir_arg(os.path.dirname(os.path.abspath(sys.argv[0])), arg_d)
+        
+    if not all_files_l:
+        print('No files detected.')
+        sys.exit()
+        
+
+def get_output_location(arg_d):
+    if not arg_d['output_dir']:         
+        if len(arg_d['input_dir_l']) == 1:
+            print('Using video dir for output')
+            arg_d['output_dir'] = arg_d['input_dir_l'][0]
+        else:
+            print('Using script/exe dir for output')
+            arg_d['output_dir'] = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+    output_file_path = os.path.abspath(os.path.join(arg_d['output_dir'], result_filename))
+    return arg_d, output_file_path
 
 
 # Append every video from ALL key to checked_files_l
@@ -258,6 +298,12 @@ def tess_working():
         print('Check the Advanced Usage document on Github for more info.')
         sys.exit()
 
+
+def is_file_readable(filepath):
+    if not os.access(filepath, os.R_OK):
+        print('Error: File is not readable:', filepath)
+        return False
+    
 
 def check_writeable_dir():
     try:
@@ -330,20 +376,23 @@ def get_player_name(text):
 
 
 def add_player_name(name, video_path, player_name_d):
-    if name in player_name_d:  # Name already in dict
+    if name in player_name_d:
         if not video_path in player_name_d[name]:  # Prevent dups
             print('Adding video to existing name:', video_path, name)
             player_name_d[name].append(video_path)
-    else:  # New entry as list
+    else:
         print('Adding video to new name:', video_path, name)
         player_name_d[name] = [video_path]
 
 
+def get_json_from_dict(d):
+    return json.dumps(d, indent=4, ensure_ascii=False)
+
+    
 def write_res(player_name_d):
-    json_results = json.dumps(player_name_d, indent=4, ensure_ascii=False)
+    json_results = get_json_from_dict(player_name_d)
     with open(output_file_path, 'w', errors='replace') as output_file:
         output_file.write(json_results)
-    return json_results
 
 
 def checked_list_entry(video_path):
@@ -389,7 +438,7 @@ def get_frames(all_files_l):
             #frame_total = debug_end_early()
 
             while vid.frame_count + vid.frame_count_interval <= vid.frame_total:  # Loop until end of video
-                #display_progress(frame_count, frame_total, all_files_l)
+                
                 
                 frame = frame_c(vid)
 
@@ -428,6 +477,7 @@ def wait_for_frame():
             with q_lock:
                 return frame_queue.get_nowait()
         except queue.Empty:
+            print('queue empty')
             time.sleep(.1)
         except Exception as errex:
             print('__Error: queue:', errex)
@@ -463,8 +513,8 @@ def crop_nameplate(frame):
 
 # Skip if too dark or too bright, ie: nameplate not detected
 def nameplate_detect(cropped_arr):
-    ave_bright = cropped_arr.mean()  # Average brightness
-    if 11 < ave_bright < 14:  # Actual values: 12.46, 13.12
+    avg_brightness = cropped_arr.mean()
+    if 11 < avg_brightness < 14:  # Actual values: 12.46, 13.12
         return True
 
 
@@ -488,13 +538,13 @@ def process_frames(player_name_d):
             break
 
         try:
+            display_progress(frame.vid)
+            
             cropped_arr = crop_background(frame)
-
             if not nameplate_detect(cropped_arr):
                 continue
 
             cropped_arr = crop_nameplate(frame)
-            
             ocr_text = get_ocr_text(cropped_arr)
             if not ocr_text:
                 continue
@@ -515,17 +565,17 @@ def process_frames(player_name_d):
 
 
 # Display progress occasionally
-def display_progress(skip_tally, frame_count, frame_total, all_files_l):
-    if skip_tally < 50:
-        skip_tally += 1
-        return skip_tally
+def display_progress(vid):
+    if video.skip_tally < 5:
+        video.skip_tally += 1
+        return
 
-    skip_tally = 0
+    video.skip_tally = 0
 
-    file_prog = frame_count / frame_total
+    file_prog = vid.frame_count / vid.frame_total
 
-    tot_prog_inc = 1 / len(all_files_l) * 100
-    additional_inc = round(tot_prog_inc * file_prog)
+    total_prog_inc = 1 / len(all_files_l) * 100
+    additional_inc = round(total_prog_inc * file_prog)
 
     total_prog_simple = round(video.current_file_i / len(all_files_l) * 100)
     total_prog_adv = additional_inc + total_prog_simple
@@ -533,56 +583,53 @@ def display_progress(skip_tally, frame_count, frame_total, all_files_l):
     print('\nFile progress:', str(round(file_prog * 100)) + '%')
     print('Total progress:', str(total_prog_adv) + '%')
     print('Frames in queue:', frame_queue.qsize(), '\n')
-    return skip_tally
 
 
+def display_results():
+    print(get_json_from_dict(player_name_d))
+    print('\n\n\n\t-------- Complete. --------')
+    print('\nOutput file saved at:', output_file_path)
+    
+
+def prevent_divide_by_zero():
+    for each_l in [video.kbit_per_frame_l, time_vcap_l, time_frame_read_l, time_crop_l, time_tess_l]:
+        if not each_l:
+            each_l.append(0)
 
 
+def display_stats():
+    duration = time.time() - startTime
+
+    print('\n\nRun time duration:', round(duration / 60), 'minutes')
+    print('Footage processed:', round(video.duration_gt / 60), 'minutes')
+    print('\nAvg processing speed:', str(round(video.duration_gt / duration, 1)) + 'x')
+    print('Avg frames per sec:  ', round(video.frame_gt / duration))
+    print('kbits per sec:       ', round(sum(video.kbit_per_frame_l) / duration))  ## should this be averaged?
+    print('\nvideo capture avg:', round(sum(time_vcap_l) / len(time_vcap_l), 4))
+    print('frame read avg:   ', round(sum(time_frame_read_l) / len(time_frame_read_l), 4))
+    #print('time_crop_l avg:', sum(time_crop_l) / len(time_crop_l))
+    print('OCR read avg:     ', round(sum(time_tess_l) / len(time_tess_l), 4))
+    print(f'\nVersion: {version}')
 
 
 
 
 if __name__ == '__main__':
-
     print('Arguments:', sys.argv[1:])
-
-    # Default input and output directory
-    default_path = os.path.dirname(os.path.abspath(sys.argv[0]))
-
-    # Default options
-    arg_d = {
-    'recursive': True,
-    'noskip': False,
-    'output_dir': None,
-    'explicit_output': False,
-    'result_file_l': [],
-    'leniency': 1
-    }
 
     result_filename = 'ds3_rr_results.txt'
     queue_max_size = 200
-    all_files_l = []  # All the videos found
-    checked_files_l = []  # Used only by get_frames_f to track completed videos 
-    player_name_d = {"  ALL  ": []}  # Used by process_frames_f to mark a video as complete and for Resumption
+    all_files_l = []
+    checked_files_l = []  # Used only by get_frames to track completed videos 
+    player_name_d = {"  ALL  ": []}  # Used by process_frames to mark a video as complete and for Resumption
 
-
+    arg_d = set_default_options()
     arg_d = parse_args(sys.argv[1:], arg_d)
-
-    # If no files as input, default to all files in script/exe dir
-    if not all_files_l:
-        arg_d = parse_args([default_path], arg_d)
-
+    check_no_input_files(arg_d)
     merge_input_files(arg_d['result_file_l'])
-        
     init_checked_list()
-
-    # Set output location if not specified
-    if not arg_d['output_dir']:
-        arg_d['output_dir'] = os.getcwd()
-
-    output_file_path = os.path.abspath(os.path.join(arg_d['output_dir'], result_filename))
-
-    print(json.dumps(arg_d, indent=4))
+    arg_d, output_file_path = get_output_location(arg_d)
+    print(get_json_from_dict(arg_d))
 
     set_tess_exe()
     tess_working()
@@ -601,36 +648,13 @@ if __name__ == '__main__':
     p2.join()
 
 
+    display_results()
+    
+    prevent_divide_by_zero()
+    display_stats()
+    
 
-
-
-    # Write and display results
-    json_results = write_res(player_name_d)
-    print(json_results)
-    print('\n\n\n\t-------- Complete. --------\n\nOutput file saved at:', output_file_path, '\n\n')
-
-    sys.exit()
-    # Prevent divide by zero error
-    for each_l in [kbit_per_frame_l, time_vcap_l, time_fr_l, time_crop_l, time_tess_l]:
-        if not each_l:
-            each_l.append(0)
-
-    # Display stats
-    frame_gt, duration_gt = frame_queue.get()
-    duration = time.time() - startTime
-
-    print('\n\nRun time duration:', round(duration / 60), 'minutes')
-    print('Footage processed:', round(duration_gt / 60), 'minutes')
-    print('\nAve processing speed:', str(round(duration_gt / duration, 1)) + 'x')
-    print('Ave frames per sec:', round(frame_gt / duration))
-    print('kbits per sec:', round(sum(kbit_per_frame_l) / duration))  ## should this be averaged?
-    print('video capture ave:', sum(time_vcap_l) / len(time_vcap_l))
-    print('frame read ave:', sum(time_fr_l) / len(time_fr_l))
-    #print('time_crop_l ave:', sum(time_crop_l) / len(time_crop_l))
-    print('OCR read ave:', sum(time_tess_l) / len(time_tess_l))
-    print('\nVersion: 0.2.1-beta')
-
-    input('END')
+    #input('END')
 
 
 
