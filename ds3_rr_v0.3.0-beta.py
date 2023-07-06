@@ -1,28 +1,10 @@
 
 # Desc: Extract players' names from Dark Souls 3 gameplay videos
 
-# todo:
-# cleanup input and output dir selection +
-#   input: explicit with arg (dir or file), script/exe loc
-#   output: explicit with --output, vid dir if only one dir, script/exe loc if multi or no vid dirs
-#   remove cwd +
-#   double slash paths
-# imput_dirs in arg_d? can also be used for determining output loc +
-# remove explicit arg +
-# prog +
-#   move to processing f + ~5% improvement
-# consecutive errors
-# bench +
-# queue get: block=True, timeout=None and remove nested while true - hangs on windows
-# calc arr shape only on new vid
-# f strings
-# tally num of frame reads vs num ocr reads
-# is_file_readable(filepath) unn? test
-# --help option
-# globals
 
 
- 
+
+
 
 version = '0.3.0-beta'
 
@@ -63,7 +45,7 @@ class video:
     duration_gt = 0  # Footage duration grand total
     kbit_per_frame_l = []  # Kbits per frame grand total
 
-    
+
     def __init__(self, path):
         self.path = path
         self.name = ntpath.basename(path)
@@ -152,26 +134,26 @@ def parse_option_arg(arg, arg_d):
         case '--nonrecursive':
             arg_d['recursive'] = False
             print('Option set: nonrecursive')
-            
+
         case '--noskip':
             arg_d['noskip'] = True
             print('Option set: noskip')
-            
+
         case s if s.startswith('--output='):
             arg_d['output_dir'] = ''.join(arg.split('--output=')[1:])
             print('Option set: output location:', arg_d['output_dir'])
-            
+
         case '--strict':
             arg_d['leniency'] = 0
             print('Option set: strict phrase matching')
-            
+
         case '--lenient':
             arg_d['leniency'] = 2
             print('Option set: lenient phrase matching')
-            
+
         case other:
             print('\nOption not recognized:', arg)
-            
+
     return arg_d
 
 
@@ -206,7 +188,7 @@ def parse_args(arg_l, arg_d):
 
         elif os.path.isdir(arg):
             arg_d = parse_dir_arg(arg, arg_d)
-            
+
         elif os.path.isfile(arg):
             arg_d = parse_file_arg(arg, arg_d)
 
@@ -221,7 +203,7 @@ def merge_input_files(result_file_l):
         with open(input_file, 'r') as res_file:
             new_d = json.loads(res_file.read())
 
-        for key, value in new_d.items(): 
+        for key, value in new_d.items():
             if key in player_name_d:  # Player name already exists
                 for each_vid in value:  # Append all videos to the key
                     if not each_vid in player_name_d[key]:  # Prevent dups
@@ -234,14 +216,14 @@ def check_no_input_files(arg_d):
     if not all_files_l:
         print('Using script/exe dir for input')
         arg_d = parse_dir_arg(os.path.dirname(os.path.abspath(sys.argv[0])), arg_d)
-        
+
     if not all_files_l:
         print('No files detected.')
         sys.exit()
-        
+
 
 def get_output_location(arg_d):
-    if not arg_d['output_dir']:         
+    if not arg_d['output_dir']:
         if len(arg_d['input_dir_l']) == 1:
             print('Using video dir for output')
             arg_d['output_dir'] = arg_d['input_dir_l'][0]
@@ -280,7 +262,7 @@ def set_tess_exe():
     else:
         print('Running as a script')
         ## Uncomment next line and replace with your location of the Tesseract executable
-        pytesseract.tesseract_cmd = r"C:\Users\jschiffler\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+        #pytesseract.tesseract_cmd = r"C:\Users\jschiffler\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
 
 
 def tess_working():
@@ -303,7 +285,7 @@ def is_file_readable(filepath):
     if not os.access(filepath, os.R_OK):
         print('Error: File is not readable:', filepath)
         return False
-    
+
 
 def check_writeable_dir():
     try:
@@ -312,7 +294,7 @@ def check_writeable_dir():
         if not os.path.isdir(arg_d['output_dir']):
             print('\n\n __Error: Output location must be a directory.\n\n')
             sys.exit()
-        
+
         with open(test_loc, 'w', errors='replace') as output_file:
             output_file.write('TEST_TEXT')
 
@@ -320,7 +302,7 @@ def check_writeable_dir():
             content = output_file.read()
 
         if content == 'TEST_TEXT':
-            os.remove(test_loc) 
+            os.remove(test_loc)
 
         else:
             raise
@@ -336,7 +318,7 @@ def get_player_name(text):
     print(text)  ##
     name = text  # This is needed for lenient matching
     lenient_val = arg_d['leniency']  # Decrement this value to allow for 1 or 2 missing phrases
-    try: 
+    try:
 
         # No suffix phrases
         for prefix in no_suffix_l:
@@ -388,7 +370,7 @@ def add_player_name(name, video_path, player_name_d):
 def get_json_from_dict(d):
     return json.dumps(d, indent=4, ensure_ascii=False)
 
-    
+
 def write_res(player_name_d):
     json_results = get_json_from_dict(player_name_d)
     with open(output_file_path, 'w', errors='replace') as output_file:
@@ -415,14 +397,14 @@ def debug_end_early():
         frame_total = breakpoint
     return frame_total
 
-    
+
 # Put frames in queue
 def get_frames(all_files_l):
     for video_path in all_files_l:
         print('\n Reading file:', video_path)
 
         vid = video(video_path)
-        
+
         try:
             if not checked_list_entry(vid.path):
                 continue
@@ -438,8 +420,8 @@ def get_frames(all_files_l):
             #frame_total = debug_end_early()
 
             while vid.frame_count + vid.frame_count_interval <= vid.frame_total:  # Loop until end of video
-                
-                
+
+
                 frame = frame_c(vid)
 
                 vid.select_next_frame()
@@ -477,11 +459,10 @@ def wait_for_frame():
             with q_lock:
                 return frame_queue.get_nowait()
         except queue.Empty:
-            print('queue empty')
-            time.sleep(.1)
+            time.sleep(.3)
         except Exception as errex:
             print('__Error: queue:', errex)
-                
+
 
 # Select area above nameplate text
 # Crop as percent so unaffected by resolution
@@ -522,7 +503,7 @@ def nameplate_detect(cropped_arr):
 def get_ocr_text(cropped_arr):
     tess_config = '''-c tessedit_do_invert=1 -c tessedit_char_whitelist="!\\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ " --psm 7 --oem 1'''
     t4 = time.perf_counter()
-    
+
     ocr_text = pytesseract.image_to_string(cropped_arr, timeout=5, config=tess_config)
 
     time_tess_l.append((time.perf_counter() - t4))
@@ -533,13 +514,13 @@ def get_ocr_text(cropped_arr):
 def process_frames(player_name_d):
     while True:
         frame, last_frame_b = wait_for_frame()
-        
+
         if end_detect(frame):
             break
 
         try:
             display_progress(frame.vid)
-            
+
             cropped_arr = crop_background(frame)
             if not nameplate_detect(cropped_arr):
                 continue
@@ -548,11 +529,11 @@ def process_frames(player_name_d):
             ocr_text = get_ocr_text(cropped_arr)
             if not ocr_text:
                 continue
-            
+
             player_name = get_player_name(ocr_text)
             if not player_name:
                 continue
-            
+
             add_player_name(player_name, frame.vid.path, player_name_d)
 
         except Exception as errex:
@@ -566,7 +547,7 @@ def process_frames(player_name_d):
 
 # Display progress occasionally
 def display_progress(vid):
-    if video.skip_tally < 5:
+    if video.skip_tally < 100:
         video.skip_tally += 1
         return
 
@@ -589,7 +570,7 @@ def display_results():
     print(get_json_from_dict(player_name_d))
     print('\n\n\n\t-------- Complete. --------')
     print('\nOutput file saved at:', output_file_path)
-    
+
 
 def prevent_divide_by_zero():
     for each_l in [video.kbit_per_frame_l, time_vcap_l, time_frame_read_l, time_crop_l, time_tess_l]:
@@ -620,7 +601,7 @@ if __name__ == '__main__':
     result_filename = 'ds3_rr_results.txt'
     queue_max_size = 200
     all_files_l = []
-    checked_files_l = []  # Used only by get_frames to track completed videos 
+    checked_files_l = []  # Used only by get_frames to track completed videos
     player_name_d = {"  ALL  ": []}  # Used by process_frames to mark a video as complete and for Resumption
 
     arg_d = set_default_options()
@@ -649,14 +630,12 @@ if __name__ == '__main__':
 
 
     display_results()
-    
+
     prevent_divide_by_zero()
     display_stats()
-    
-
-    #input('END')
 
 
+   
 
 
 
