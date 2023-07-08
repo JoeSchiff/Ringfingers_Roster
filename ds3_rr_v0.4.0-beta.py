@@ -1,4 +1,28 @@
 
+# Desc: Extract players' names from Dark Souls 3 gameplay videos
+
+# todo:
+# sep funcs for get framerate and total frames
+# cleanup input and output dir selection +
+#   input: explicit with arg (dir or file), script/exe loc
+#   output: explicit with --output, vid dir if only one dir, script/exe loc if multi or no vid dirs
+#   remove cwd +
+#   double slash paths
+# imput_dirs in arg_d? can also be used for determining output loc +
+# remove explicit arg +
+# prog +
+#   move to processing f + ~5% improvement
+# consecutive errors
+# bench +
+# queue get: block=True, timeout=None and remove nested while true - hangs on windows
+# calc arr shape only on new vid
+# f strings
+# tally num of frame reads vs num ocr reads
+# is_file_readable(filepath) unn? test
+# --help option
+# globals
+
+
  
 
 version = '0.4.0-beta'
@@ -8,7 +32,7 @@ import time
 import sys
 import os
 import ntpath
-import cv2
+import imageio.v3 as iio
 import mimetypes
 from pytesseract import pytesseract
 import json
@@ -61,9 +85,8 @@ class video:
         try:
             self.frame_count = 0
             self.time_vcap = time.perf_counter()
-            self.vcap = cv2.VideoCapture(self.path)
+            self.vcap = iio.imopen(self.path, "r", plugin="pyav")
             time_vcap_l.append((time.perf_counter() - self.time_vcap))
-            if not self.vcap.isOpened(): raise
             return True
         except Exception as errex:
             print('__Error: Unable to read file as video.', errex, '\nSkipping:', self.path)
@@ -71,22 +94,20 @@ class video:
 
 
     def select_next_frame(self):
-        #self.frame_count += self.frame_count_interval
-        for i in range(self.frame_count_interval):
-            self.vcap.grab()
+        self.frame_count += 33
 
 
     def get_video_info(self):
         try:
-            self.frame_total = self.vcap.get(7)  # Num of frames in video
-            if self.frame_total < 1: raise
-            self.frame_rate = round(self.vcap.get(5))
+            #self.frame_total = self.vcap.get(7)  # Num of frames in video
+            #if self.frame_total < 1: raise
+            self.frame_rate = iio.immeta(path, plugin='pyav')['fps']
             print('fps:', self.frame_rate)
             self.frame_count_interval = round(self.frame_rate * 1.116666667)  # Select every 67th frame (on 60fps)
-            self.video_duration = self.frame_total / self.frame_rate
-            print('video_duration:', self.video_duration)
-            self.kbit_per_frame = round(self.vcap.get(47) / self.frame_rate)  # For bitrate benchmark
-            self.weighted_kbit = self.kbit_per_frame * self.frame_total / self.frame_count_interval  ## ?
+            #self.video_duration = self.frame_total / self.frame_rate
+            #print('video_duration:', self.video_duration)
+            #self.kbit_per_frame = round(self.vcap.get(47) / self.frame_rate)  # For bitrate benchmark
+            #self.weighted_kbit = self.kbit_per_frame * self.frame_total / self.frame_count_interval  ## ?
         except:
             print('__Error: Unable to get frame data. Skipping:', self.path)
 
@@ -107,11 +128,15 @@ class frame_c:
         self.vid = vid
         time_frame_read = time.perf_counter()
         try:
-            #vid.vcap.set('CAP_PROP_POS_FRAMES', vid.frame_count)  # which frame to read
-            self.numpy_array = vid.vcap.retrieve()[1][:, :, 0]  # Read frame # Remove color data
+            self.numpy_array = vid.vcap.read(index=vid.frame_count)  # Decode frame
             time_frame_read_l.append((time.perf_counter() - time_frame_read))
         except Exception as errex:
-            print('vcap frame read failed')
+            print('vcap frame read failed:', errex)
+
+
+    def frame_available(self):
+        if hasattr(self, 'numpy_array'):
+            return True
 
 
 def set_default_options():
@@ -412,17 +437,22 @@ def get_frames(all_files_l):
             if not vid.get_video_capture():
                 continue
 
-            vid.get_video_info()
+            #vid.get_video_info()
 
             #frame_total = debug_end_early()
 
-            while vid.frame_count + vid.frame_count_interval <= vid.frame_total:  # Loop until end of video
+            while True:  # Loop until end of video
                 frame = frame_c(vid)
 
-                vid.select_next_frame()
+                if not frame.frame_available():
+                    print(7777)
+                    break
 
+
+                vid.select_next_frame()
+                
                 with q_lock:
-                    frame_queue.put((frame, vid.is_last_frame()), block=True, timeout=None)
+                    frame_queue.put((frame, False), block=True, timeout=None)
 
             vid.tally_video_stats()  # End of each video
 
@@ -515,8 +545,8 @@ def process_frames(player_name_d):
             break
 
         try:
-            display_progress(frame.vid)
-            
+            #display_progress(frame.vid)
+
             cropped_arr = crop_background(frame)
             if not nameplate_detect(cropped_arr):
                 continue
@@ -535,8 +565,8 @@ def process_frames(player_name_d):
         except Exception as errex:
             print(errex, sys.exc_info()[2].tb_lineno)
 
-        finally:
-            last_frame_detect(frame, last_frame_b)
+        #finally:
+            #last_frame_detect(frame, last_frame_b)
 
     print('\nEnd of all video processing')
 
@@ -632,6 +662,17 @@ if __name__ == '__main__':
     
 
     #input('END')
+
+
+
+
+
+
+
+
+
+
+
 
 
 
