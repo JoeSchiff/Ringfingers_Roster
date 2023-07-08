@@ -57,7 +57,7 @@ no_suffix_l = ['Invaded the world of Host of Embers', 'Invaded by dark spirit', 
 
 
 
-class video:
+class Video:
     current_file_i = -1  # for prog
     skip_tally = 0  # for prog
     frame_gt = 0  # Number of frames grand total
@@ -68,7 +68,7 @@ class video:
     def __init__(self, path):
         self.path = path
         self.name = ntpath.basename(path)
-        video.current_file_i += 1
+        Video.current_file_i += 1
         consec_err = 0
 
 
@@ -94,48 +94,52 @@ class video:
 
 
     def select_next_frame(self):
-        self.frame_count += 33
+        self.frame_count += self.frame_count_interval
 
 
     def get_video_info(self):
         try:
             #self.frame_total = self.vcap.get(7)  # Num of frames in video
             #if self.frame_total < 1: raise
-            self.frame_rate = iio.immeta(path, plugin='pyav')['fps']
+            metadata = iio.immeta(self.path, plugin='pyav')
+
+            # alt: self.frame_total = self.vcap._container.streams.video[0].frames
+                    
+            self.frame_rate = metadata['fps']
             print('fps:', self.frame_rate)
             self.frame_count_interval = round(self.frame_rate * 1.116666667)  # Select every 67th frame (on 60fps)
-            #self.video_duration = self.frame_total / self.frame_rate
+            self.video_duration = metadata['duration']
+            self.frame_total = self.video_duration * self.frame_rate  # not accurate
             #print('video_duration:', self.video_duration)
             #self.kbit_per_frame = round(self.vcap.get(47) / self.frame_rate)  # For bitrate benchmark
             #self.weighted_kbit = self.kbit_per_frame * self.frame_total / self.frame_count_interval  ## ?
-        except:
-            print('__Error: Unable to get frame data. Skipping:', self.path)
-
-
-    def is_last_frame(self):
-        if self.frame_count + self.frame_count_interval > self.frame_total:
-            return True
+        except Exception as errex:
+            print('__Error: Unable to get video info. Skipping:', self.path, errex)
 
 
     def tally_video_stats(self):
-        video.frame_gt += self.frame_total
-        video.duration_gt += self.video_duration
-        video.kbit_per_frame_l.append(self.weighted_kbit)
+        Video.frame_gt += self.frame_total
+        Video.duration_gt += self.video_duration
+        #Video.kbit_per_frame_l.append(self.weighted_kbit)
 
 
-class frame_c:
+class Frame:
     def __init__(self, vid):
         self.vid = vid
         time_frame_read = time.perf_counter()
         try:
             self.numpy_array = vid.vcap.read(index=vid.frame_count)  # Decode frame
+            self.frame_index = vid.frame_count
             time_frame_read_l.append((time.perf_counter() - time_frame_read))
+        except StopIteration:
+            print('end of video:', self.vid.name)
         except Exception as errex:
             print('vcap frame read failed:', errex)
 
 
-    def frame_available(self):
+    def available(self):
         if hasattr(self, 'numpy_array'):
+            #print(self.vid.frame_count)
             return True
 
 
@@ -284,7 +288,7 @@ def set_tess_exe():
     else:
         print('Running as a script')
         ## Uncomment next line and replace with your location of the Tesseract executable
-        #pytesseract.tesseract_cmd = r"C:\Users\jschiffler\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+        pytesseract.tesseract_cmd = r"C:\Users\jschiffler\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
 
 
 def tess_working():
@@ -425,7 +429,7 @@ def get_frames(all_files_l):
     for video_path in all_files_l:
         print('\n Reading file:', video_path)
 
-        vid = video(video_path)
+        vid = Video(video_path)
         
         try:
             if not checked_list_entry(vid.path):
@@ -437,17 +441,15 @@ def get_frames(all_files_l):
             if not vid.get_video_capture():
                 continue
 
-            #vid.get_video_info()
+            vid.get_video_info()
 
             #frame_total = debug_end_early()
 
             while True:  # Loop until end of video
-                frame = frame_c(vid)
+                frame = Frame(vid)
 
-                if not frame.frame_available():
-                    print(7777)
+                if not frame.available():
                     break
-
 
                 vid.select_next_frame()
                 
@@ -485,7 +487,7 @@ def wait_for_frame():
                 return frame_queue.get_nowait()
         except queue.Empty:
             print('queue empty')
-            time.sleep(.1)
+            time.sleep(.5)
         except Exception as errex:
             print('__Error: queue:', errex)
                 
@@ -545,7 +547,7 @@ def process_frames(player_name_d):
             break
 
         try:
-            #display_progress(frame.vid)
+            display_progress(frame)
 
             cropped_arr = crop_background(frame)
             if not nameplate_detect(cropped_arr):
@@ -571,20 +573,19 @@ def process_frames(player_name_d):
     print('\nEnd of all video processing')
 
 
-# Display progress occasionally
-def display_progress(vid):
-    if video.skip_tally < 5:
-        video.skip_tally += 1
+def display_progress(frame):
+    if Video.skip_tally < 50:
+        Video.skip_tally += 1
         return
 
-    video.skip_tally = 0
+    Video.skip_tally = 0
 
-    file_prog = vid.frame_count / vid.frame_total
+    file_prog = frame.frame_index / frame.vid.frame_total
 
     total_prog_inc = 1 / len(all_files_l) * 100
     additional_inc = round(total_prog_inc * file_prog)
 
-    total_prog_simple = round(video.current_file_i / len(all_files_l) * 100)
+    total_prog_simple = round(Video.current_file_i / len(all_files_l) * 100)
     total_prog_adv = additional_inc + total_prog_simple
 
     print('\nFile progress:', str(round(file_prog * 100)) + '%')
@@ -599,7 +600,7 @@ def display_results():
     
 
 def prevent_divide_by_zero():
-    for each_l in [video.kbit_per_frame_l, time_vcap_l, time_frame_read_l, time_crop_l, time_tess_l]:
+    for each_l in [Video.kbit_per_frame_l, time_vcap_l, time_frame_read_l, time_crop_l, time_tess_l]:
         if not each_l:
             each_l.append(0)
 
@@ -608,10 +609,10 @@ def display_stats():
     duration = time.time() - startTime
 
     print('\n\nRun time duration:', round(duration / 60), 'minutes')
-    print('Footage processed:', round(video.duration_gt / 60), 'minutes')
-    print('\nAvg processing speed:', str(round(video.duration_gt / duration, 1)) + 'x')
-    print('Avg frames per sec:  ', round(video.frame_gt / duration))
-    print('kbits per sec:       ', round(sum(video.kbit_per_frame_l) / duration))  ## should this be averaged?
+    print('Footage processed:', round(Video.duration_gt / 60), 'minutes')
+    print('\nAvg processing speed:', str(round(Video.duration_gt / duration, 1)) + 'x')
+    print('Avg frames per sec:  ', round(Video.frame_gt / duration))
+    print('kbits per sec:       ', round(sum(Video.kbit_per_frame_l) / duration))  ## should this be averaged?
     print('\nvideo capture avg:', round(sum(time_vcap_l) / len(time_vcap_l), 4))
     print('frame read avg:   ', round(sum(time_frame_read_l) / len(time_frame_read_l), 4))
     #print('time_crop_l avg:', sum(time_crop_l) / len(time_crop_l))
