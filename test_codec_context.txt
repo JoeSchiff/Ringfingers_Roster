@@ -1,0 +1,37 @@
+test_codec_context.py
+video_encoding
+
+
+where test encoding? test_encode.py, test_codec_context.py
+ctx.gop_size default is -1. change is int?
+audio has test transcode but not video
+these methods arent called?
+
+
+frame count tested test_decode.py and test_codec_context.py
+
+more video codecs: 265, av1
+
+ctx.options unused: crf, bitrate, time_base/framerate
+
+assert all options
+
+test_bad always false
+
+"reformatter" in docs should be "reformat" https://pyav.org/docs/develop/api/video.html
+
+write reformat docs?
+ctx.encode(bad_frame) ret val not captured
+
+include encoded_frame_count with self.assertEqual(frame_count, decoded_frame_count)
+
+@property
+
+import cv2 for https://github.com/PyAV-Org/PyAV/blob/main/scratchpad/encode_frames.py
+
+
+gop_size setter and getter test
+either use a video with a known value
+or determine programmatically. must account for variable gop_size
+
+
