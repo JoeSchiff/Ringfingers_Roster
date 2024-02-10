@@ -18,6 +18,7 @@ assign and test again
 
 
 https://ffmpeg.org/doxygen/trunk/structAVPacket.html
+https://ffmpeg.org/doxygen/trunk/group__lavc__packet.html
 
 
 many different names. is this from ffmpeg?
@@ -29,11 +30,12 @@ packet: 'is_corrupt', 'is_keyframe'
 
 
 
-packet.is_keyframe does not match frame.key_frame: fate_suite("h264/interlaced_crop.mp4") and fate_suite("h264/bbc2.sample.h264")
-always off by 5? -
-need to test in ffmpeg
-decoder delay?
 
+output_corrupt
+low_delay True is default?
+packet.update()
+
+Consider CodecContextFlags, whis is the type 
 
 
 cc.codec.delay is bool should be int?
@@ -61,9 +63,11 @@ from av.datasets import fate as fate_suite
 
 
 #PATHS = (r"C:\Users\jschiffler\Desktop\text_n_stuff\old_bullshit\2023\rr\short_test.mp4", fate_suite("h264/bbc2.sample.h264"), av.datasets.curated("pexels/time-lapse-video-of-night-sky-857195.mp4"), fate_suite("h264/interlaced_crop.mp4"))
-PATH = r"C:\Users\jschiffler\Desktop\text_n_stuff\old_bullshit\2023\rr\short_test.mp4"
-PATH = av.datasets.curated("pexels/time-lapse-video-of-night-sky-857195.mp4")
+PATH = fate_suite("h264/interlaced_crop.mp4")
 
+
+pl = []
+fl = []
 
 with av.open(PATH) as container:
     stream = container.streams.video[0]
@@ -72,16 +76,24 @@ with av.open(PATH) as container:
     cc.thread_type = "NONE"
     cc.low_delay = True
     for packet in container.demux(stream):
-        print(f"\n{packet.is_keyframe=}")
+        #print('\n', packet)
+        #print(f"\n{packet.is_keyframe=}")
+        if packet.is_keyframe:
+            pl.append(packet.pts)
         for frame in stream.decode(packet):
-            if packet.is_keyframe != frame.key_frame:
-                print(3333333)
-            print(frame.index, frame.key_frame)
+            if frame.key_frame:
+                fl.append(frame.pts)
+            #print(frame)
+            #if packet.is_keyframe != frame.key_frame:
+            #    print(3333333)
+            #print(frame.index, frame.key_frame)
     while True:
         for frame in cc.decode(None):
             print(999)
 
 
+print(pl)
+print(fl)
 
 
 
@@ -97,7 +109,14 @@ with av.open(PATH) as container:
 
 
 
+"""
+ffmpeg
+codec: low delay, cap delay
+context: delay
 
+
+
+"""
 
 
 
