@@ -69,27 +69,27 @@ PATH = fate_suite("h264/interlaced_crop.mp4")
 pl = []
 fl = []
 
-with av.open(PATH) as container:
-    stream = container.streams.video[0]
-    cc = stream.codec_context
-    cc.thread_count = 1
-    cc.thread_type = "NONE"
-    cc.low_delay = True
-    for packet in container.demux(stream):
-        #print('\n', packet)
-        #print(f"\n{packet.is_keyframe=}")
-        if packet.is_keyframe:
-            pl.append(packet.pts)
-        for frame in stream.decode(packet):
-            if frame.key_frame:
-                fl.append(frame.pts)
-            #print(frame)
-            #if packet.is_keyframe != frame.key_frame:
-            #    print(3333333)
-            #print(frame.index, frame.key_frame)
-    while True:
-        for frame in cc.decode(None):
-            print(999)
+container = av.open(PATH)
+stream = container.streams.video[0]
+cc = stream.codec_context
+cc.thread_count = 1
+cc.thread_type = "NONE"
+cc.low_delay = True
+for packet in container.demux(stream):
+    #print('\n', packet)
+    #print(f"\n{packet.is_keyframe=}")
+    if packet.is_keyframe:
+        pl.append(packet.pts)
+    for frame in stream.decode(packet):
+        if frame.key_frame:
+            fl.append(frame.pts)
+        #print(frame)
+        #if packet.is_keyframe != frame.key_frame:
+        #    print(3333333)
+        #print(frame.index, frame.key_frame)
+while True:
+    for frame in cc.decode(None):
+        print(999)
 
 
 print(pl)
@@ -110,11 +110,41 @@ print(fl)
 
 
 """
-ffmpeg
-codec: low delay, cap delay
-context: delay
+#### Overview
+`codec.delay` is declared as an integer: https://github.com/PyAV-Org/PyAV/blob/8e32fe7ed7b83eff27682b4e026e7320cb8dfe1e/include/libavcodec/avcodec.pxd#L192
+However, trying to access it returns a boolean.
 
+```
+import av
+from av.datasets import fate as fate_suite
 
+PATH = fate_suite("h264/interlaced_crop.mp4")
+
+container = av.open(PATH)
+stream = container.streams.video[0]
+print(stream.codec_context.codec.delay)
+```
+Output:
+```
+True
+```
+
+#### Explanation
+PyAV's `codec.delay` is a reference to ffmpeg's [AV_CODEC_CAP_DELAY](https://ffmpeg.org/doxygen/6.0/group__lavc__core.html#ga3f55f5bcfbb12e06c7cb1195028855e6).
+
+The :type: int `delay` is likely supposed to be a reference to ffmpeg's [AVCodecContext::delay](https://ffmpeg.org/doxygen/6.0/structAVCodecContext.html#a948993adfdfcd64b81dad1151fe50f33).
+
+I believe the :type: int `delay` is being overwritten by the :type: bool `delay` here:
+https://github.com/PyAV-Org/PyAV/blob/8e32fe7ed7b83eff27682b4e026e7320cb8dfe1e/av/codec/codec.pyx#L313
+
+#### Changes
+I created a property `codec_context.delay` which references ffmpeg's `AVCodecContext::delay`.
+I renamed `codec.delay` to `codec.cap_delay` to match ffmpeg's `AV_CODEC_CAP_DELAY` and to differentiate from the former.
+
+#### Tests
+Since the ffmpeg docs state "Set by libavcodec.", I was unsure how to test these properties. I ended up finding a file in the FATE suite with a detected delay value. I don't know how to verify that the value returned `codec_context.delay` is accurate, so the test passes if any delay is detected.
+
+If this is an acceptable testing strategy, then I'll write up more tests to help merge some of the other PRs.
 
 """
 
