@@ -1,0 +1,379 @@
+
+
+#720/1080 '/home/joepers/Videos/DS3/all/DARK SOULS™ III_ The Fire Fades™ Edition_20200916210007.mp4' '/home/joepers/Videos/DS3/all/DARK SOULS™ III_ The Fire Fades™ Edition_20210104173816.webm'
+
+
+# To do Beta:
+test all options
+doc cleanup
+
+
+# To do Stable:
+test perf of imageio.getreader()
+test perf of taller text box. high text will prob screw up rms and psm
+detect some common words like "summon" and "darkmoon" to help with long messages
+test more video formats
+result file doesnt consider diff options: run program as strict. run again as lenient. program will pick up result file and skip videos.
+ubuntu 1804?
+test on manjaro
+use quotes in examples?
+attempt locate tess exe? os.path.expanduser("~")
+fallback to default number on unimportant errors like framerate?
+refactor main +
+test with thresh
+cv2.setNumThreads(n) +
+trailing exclam mark sometimes
+
+
+
+promote
+    discord
+    youtube story post
+    reddit post
+    contact email?
+    ask about video organization
+
+
+
+
+Phase 1:
+Basic features
+
+Beta Release: 2/6
+
+Compatibility / Bug fixes
+
+Stable Release: 2/13
+
+Phase 2:
+Quality of results
+
+Phase 3:
+Performance
+
+Phase 4:
+Advanced features
+
+
+
+later:
+how handle adding grand totals on error
+fallback to different video capture on opencv error
+verbose option
+overwrite progress
+
+new tess word dict
+https://tesseract-ocr.github.io/tessdoc/tess3/ControlParams.html
+https://github.com/tesseract-ocr/tesseract/blob/main/doc/tesseract.1.asc#config-files-and-augmenting-with-user-data
+
+sort result file. current sort is order they were found
+"~" doesnt work in output arg
+
+import ntpath
+only available on?
+
+
+https://api.github.com/repos/JoeUgly/Ringfingers_Roster/releases
+
+
+problem vids:
+3lade of the Darkmoon Anubis_God01 summoned through concord: /home/joepers/Videos/DS3/all/DARK SOULS™ III_ The Fire Fades™ Edition_20200916210007.mp4
+shadow_4_1: "/home/joepers/Videos/DS3/2v1/DARK SOULS™ III_ The Fire Fades™ Edition_20200217225510.mp4"
+
+
+
+
+
+# faster
+#   mulit instances
+#   async? - not waiting on IO or net
+#       try it for vcap.read
+#   calc rms and reduce noise from numpy array not image
+#       currently converting to image 2 times
+#   read fewer frames
+#   OCR fewer frames
+#   set region and channel of interest before read. cv.SetImageCOI(image, coi) -
+#   different video reader
+#       decord: high mem usage, not faster
+#       imageio: similar speed
+#       ffmpeg: confusing, weird format
+# Batch processing with a single file containing the list of multiple image file paths. cant find way without writing filenames to file. separated by newline
+# tess fast traineddata only works on 4.0
+
+# accuracy
+#   train with font
+#   upgrade tesseract: sudo add-apt-repository ppa:alex-p/tesseract-ocr-devel +
+#   optional fuzzy matching for phrases
+
+# error catch
+#   fps, frame counts etc
+fps check
+
+# misc:
+# text cleanup
+# more benchmarking
+# write output after every video +
+config file?
+single char args options
+
+# options:
+# double confirm names -
+# check only part of vid. ex: first or last minute
+# phrase matching +
+# verbose / benchmarking
+# dup: exclude vid name or path? +
+# output location +
+
+
+
+# concerns:
+# Task completed is two lines of text. vert crop position is wrong. can expand text crop area. make this an option
+# long names can cause text to go beyond nameplate. ignore. very lenient will still catch
+# newline char in player name will cause json error -
+# get_args_f return arg_d?
+
+
+
+later future roadmap
+future features in docs
+tally wins vs loses against a player? win percent as invader vs ganker?
+
+
+
+# works:
+#   '--output=/home/joepers/Videos/DS3/Untitled Folder'
+#   --output='/home/joepers/Videos/DS3/Untitled Folder'
+#   --output=/home/joepers/Videos/DS3/Untitled\ Folder 
+
+
+
+# 60 fps:
+# np starts at ~ 5s, ends ~ 10s
+# 17f of transparency
+# opaque from 18f - 54f (36f)
+# 17f of transparency
+# 11f of clear
+# 17f of transparency
+# 46f of non useable frames in between
+# 0.439s
+# max window = 67f?
+
+
+
+      good                good                good
+1:00.00 - 1:00.36 - 1:01.22 - 1:01.58 - 1:02.44 - 1:03.20
+                 bad                 bad
+
+
+
+
+
+
+
+
+
+
+
+
+Duration: 0:00:40.153840 
+Frames/sec: 201
+
+
+Duration: 0:00:20.612868 
+Frames/sec: 402
+
+
+
+
+Duration: 0:00:22.431269 
+Frames/sec: 519
+duration_grand_total: 387.1
+17.5x
+
+Duration: 0:02:21.178598 
+Frames/sec: 325
+duration_grand_total: 763.4833333333333
+5.5x
+
+
+
+
+
+
+
+
+dash means frame was in queue and ready
+7 means queue was empty
+
+.01
+
+720
+7: 538
+-: 177
+
+1080
+7: 900
+-: 90
+
+
+waiting on read frame 
+
+
+
+.1
+
+720
+7: 60
+-: 177
+
+
+actual highest lowest nameplate brightness
+high: 13.112666573338933
+low: 12.468651880887148
+
+
+pyinstaller.exe .\test.py -y --onefile --add-data "C:\Users\jschiffler\AppData\Local\Programs\Tesseract-OCR;joejoe" --upx-dir=C:\Users\jschiffler\Downloads\upx-3.96-win32\
+
+pyinstaller -y --clean --onefile C:\Users\jschiffler\Desktop\test\rr.py --add-data "C:\Users\jschiffler\AppData\Local\Programs\Tesseract-OCR;tess"
+
+pyinstaller -y --clean --onefile C:\Users\jschiffler\Desktop\test\rr.py --add-data "C:\Users\jschiffler\AppData\Local\Programs\Tesseract-OCR;tess" --upx-dir=C:\Users\jschiffler\Downloads\upx-3.95-win64\
+134 to 119
+~ 12%
+
+startup 10 to 13.5
+~ 35%
+
+
+
+
+3801.325937986374
+
+
+Run time duration: 63 minutes
+Footage processed: 1191 minutes
+
+Ave processing speed: 18.8x
+Ave frames processed / sec: 6292
+img convert ave: 0.00024277484353636683
+video capture read ave: 0.021718774158127455
+frame read ave: 0.05980664651107539
+
+
+
+
+
+
+720p
+Ave processing speed: 21.6x
+Ave frames / sec: 649
+video capture ave: 0.009925365447998047
+frame read ave: 0.051867506720803
+img convert ave: 0.0
+OCR read ave: 0.13903422977613367
+
+Version: 0.1.0-beta
+
+
+1080p
+Ave processing speed: 6.4x
+Ave frames / sec: 385
+video capture ave: 0.05648088455200195
+frame read ave: 0.17371179174364573
+img convert ave: 0.0
+OCR read ave: 0.13992436035819675
+
+Version: 0.1.0-beta
+
+
+
+
+
+60 fps
+Input #0, matroska,webm, from '/home/joepers/Desktop/t/DARK SOULS™ III_ The Fire Fades™ Edition_20210125135913.webm':
+  Metadata:
+    encoder         : webmvideoedit-0.1.0
+  Duration: 00:00:58.04, start: 0.000000, bitrate: 20061 kb/s
+  Stream #0:0: Video: vp9 (Profile 0), yuv420p(pc, bt709), 1920x1088, SAR 136:135 DAR 16:9, 59.94 fps, 59.94 tbr, 1k tbn, 1k tbc (default)
+  Stream #0:1: Audio: opus, 48000 Hz, stereo, fltp (default)
+
+Ave processing speed: 6.0x
+Ave frames / sec: 358
+video capture ave: 0.018714427947998047
+frame read ave: 0.18961786756328508
+img convert ave: 0.0
+OCR read ave: 0.17437243461608887
+
+Version: 0.1.0-beta
+
+
+30 fps
+Input #0, matroska,webm, from '/home/joepers/Desktop/t/30fps.webm':
+  Metadata:
+    ENCODER         : Lavf58.76.100
+  Duration: 00:00:58.07, start: -0.007000, bitrate: 9926 kb/s
+  Stream #0:0: Video: vp9 (Profile 0), yuv420p(pc, bt709, progressive), 1920x1088, SAR 138:137 DAR 4140:2329, 30 fps, 30 tbr, 1k tbn, 1k tbc (default)
+    Metadata:
+      ENCODER         : Lavc58.134.100 libvpx-vp9
+      DURATION        : 00:00:58.069000000
+  Stream #0:1: Audio: opus, 48000 Hz, stereo, fltp (default)
+    Metadata:
+      ENCODER         : Lavc58.134.100 libopus
+      DURATION        : 00:00:58.065000000
+
+Ave processing speed: 3.9x
+Ave frames / sec: 119
+video capture ave: 0.02127981185913086
+frame read ave: 0.28514771835476743
+img convert ave: 0.0
+OCR read ave: 0.0
+
+Version: 0.1.0-beta
+
+
+1080 to 720 conversion
+Input #0, matroska,webm, from 'MyMovie_720p.mkv':
+  Metadata:
+    ENCODER         : Lavf58.76.100
+  Duration: 00:00:58.06, start: -0.002000, bitrate: 13375 kb/s
+  Stream #0:0: Video: h264 (High), yuv420p(tv, bt709, progressive), 1274x722 [SAR 3761:3733 DAR 958306:539047], SAR 134:133 DAR 12194:6859, 59.94 fps, 59.94 tbr, 1k tbn, 119.88 tbc (default)
+    Metadata:
+      ENCODER         : Lavc58.134.100 libx264
+      DURATION        : 00:00:58.058000000
+  Stream #0:1: Audio: opus, 48000 Hz, stereo, fltp (default)
+    Metadata:
+      DURATION        : 00:00:58.061000000
+
+Ave processing speed: 4.3x
+Ave frames / sec: 259
+video capture ave: 0.01253366470336914
+frame read ave: 0.262606003705193
+img convert ave: 0.0
+OCR read ave: 0.0
+
+Version: 0.1.0-beta
+
+
+
+1080 to 1080 conversion
+Input #0, matroska,webm, from '/home/joepers/Desktop/t/MyMovie_1080p.mkv':
+  Metadata:
+    ENCODER         : Lavf58.76.100
+  Duration: 00:00:58.06, start: -0.002000, bitrate: 26464 kb/s
+  Stream #0:0: Video: h264 (High), yuv420p(tv, bt709, progressive), 1906x1080 [SAR 960:953 DAR 16:9], SAR 137:136 DAR 130561:73440, 59.94 fps, 59.94 tbr, 1k tbn, 119.88 tbc (default)
+    Metadata:
+      ENCODER         : Lavc58.134.100 libx264
+      DURATION        : 00:00:58.058000000
+  Stream #0:1: Audio: opus, 48000 Hz, stereo, fltp (default)
+    Metadata:
+      DURATION        : 00:00:58.061000000
+
+Ave processing speed: 2.2x
+Ave frames / sec: 132
+video capture ave: 0.02107524871826172
+frame read ave: 0.5143602502112296
+img convert ave: 0.0
+OCR read ave: 0.0
+
+Version: 0.1.0-beta
+
+
