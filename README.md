@@ -28,7 +28,7 @@ You know you fought this person before, but you don't want to manually look thro
 ### Recommended method
 The easiest way to run this program is to use one of the "frozen" executables.\
 Windows 10 & 11: [ds3_rr_win_v0.2.0-beta.exe](https://github.com/JoeUgly/Ringfingers_Roster/releases/download/ds3_rr_v0.2.0-beta/ds3_rr_win_v0.2.0-beta.exe)\
-Linux Ubuntu 20.04+: [ds3_rr_linux_v0.2.0-beta](https://github.com/JoeUgly/Ringfingers_Roster/releases/download/ds3_rr_v0.2.0-beta/ds3_rr_linux_v0.2.0-beta)
+Linux Ubuntu 20.04: [ds3_rr_linux_v0.2.0-beta](https://github.com/JoeUgly/Ringfingers_Roster/releases/download/ds3_rr_v0.2.0-beta/ds3_rr_linux_v0.2.0-beta)
 
 These executables will contain the Python interpreter, the Python script, and all the dependencies.
 
